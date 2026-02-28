@@ -27,7 +27,6 @@ let state = {
   selectedFrom: null,
   lastPlaced: { X: null, O: null },
 
-  // ✅ NEW: only first turn selection
   firstTurnLocked: false,
 
   scores: { X: 0, O: 0, D: 0 }
@@ -35,8 +34,13 @@ let state = {
 
 function showToast(msg) {
   toastEl.textContent = msg;
-  toastEl.classList.add("show");
-  setTimeout(() => toastEl.classList.remove("show"), 1200);
+  toastEl.classList.remove("opacity-0", "translate-y-2");
+  toastEl.classList.add("opacity-100", "translate-y-0");
+
+  setTimeout(() => {
+    toastEl.classList.add("opacity-0", "translate-y-2");
+    toastEl.classList.remove("opacity-100", "translate-y-0");
+  }, 1400);
 }
 
 function countPieces(p) {
@@ -84,12 +88,7 @@ function checkWinner() {
   return null;
 }
 
-function glowLine(line) {
-  const cells = [...document.querySelectorAll(".cell")];
-  line.forEach(i => cells[i].classList.add("winGlow"));
-}
-
-function endGame(message, winner=null, line=null) {
+function endGame(message, winner=null) {
   state.gameOver = true;
 
   if (winner === "X") state.scores.X += 1;
@@ -98,7 +97,6 @@ function endGame(message, winner=null, line=null) {
 
   renderBoard();
   setStatus();
-  if (line) glowLine(line);
   showToast(message);
 }
 
@@ -106,28 +104,6 @@ function clearSelection() {
   state.selectedFrom = null;
 }
 
-function renderBoard() {
-  boardEl.innerHTML = "";
-  state.board.forEach((v, i) => {
-    const cell = document.createElement("button");
-    cell.className = "cell";
-    cell.dataset.index = i;
-
-    if (state.selectedFrom === i) cell.classList.add("selected");
-
-    if (v) {
-      const span = document.createElement("span");
-      span.className = `mark ${v.toLowerCase()}`;
-      span.textContent = v;
-      cell.appendChild(span);
-    }
-
-    cell.addEventListener("click", onCellClick);
-    boardEl.appendChild(cell);
-  });
-}
-
-// ✅ Auto switch after every valid move (after first move too)
 function switchTurn() {
   state.turn = state.turn === "X" ? "O" : "X";
   clearSelection();
@@ -140,6 +116,74 @@ function onFirstValidMoveLockTurnButtons() {
   }
 }
 
+function cellBaseClasses() {
+  return [
+    "aspect-square",
+    "rounded-2xl",
+    "border",
+    "border-white/10",
+    "bg-white/5",
+    "shadow-[0_0_0_rgba(0,0,0,0)]",
+    "transition",
+    "active:scale-[0.992]",
+    "hover:bg-white/10",
+    "focus-visible:outline-none",
+    "focus-visible:ring-4",
+    "focus-visible:ring-blue-400/30",
+    "grid",
+    "place-items-center",
+    "select-none",
+    "touch-manipulation"
+  ].join(" ");
+}
+
+function selectedClasses() {
+  return "ring-4 ring-blue-400/25 border-white/20 shadow-[0_18px_55px_rgba(0,0,0,.32)]";
+}
+
+function winClasses() {
+  return "ring-4 ring-emerald-400/25 border-white/25 shadow-[0_22px_70px_rgba(0,0,0,.40)]";
+}
+
+function renderBoard(winLine = null) {
+  boardEl.innerHTML = "";
+
+  const winSet = new Set(winLine || []);
+
+  state.board.forEach((v, i) => {
+    const cell = document.createElement("button");
+    cell.className = cellBaseClasses();
+    cell.type = "button";
+    cell.dataset.index = i;
+
+    if (state.selectedFrom === i) {
+      cell.className += " " + selectedClasses();
+    }
+
+    if (winSet.has(i)) {
+      cell.className += " " + winClasses();
+    }
+
+    if (state.gameOver) {
+      cell.disabled = true;
+      cell.className += " opacity-80 cursor-not-allowed";
+    }
+
+    if (v) {
+      const span = document.createElement("span");
+      span.textContent = v;
+      span.className =
+        v === "X"
+          ? "text-[clamp(44px,9vw,64px)] font-black text-emerald-300 drop-shadow-[0_12px_32px_rgba(99,245,200,.20)]"
+          : "text-[clamp(44px,9vw,64px)] font-black text-blue-300 drop-shadow-[0_12px_32px_rgba(122,167,255,.20)]";
+      cell.appendChild(span);
+    }
+
+    cell.addEventListener("click", onCellClick);
+    boardEl.appendChild(cell);
+  });
+}
+
 function onCellClick(e) {
   if (state.gameOver) return;
 
@@ -150,34 +194,30 @@ function onCellClick(e) {
   const pieces = countPieces(player);
   const inPlacePhase = pieces < state.maxPiecesPerPlayer;
 
-  // -------- PLACE PHASE (place new piece if < 3) --------
+  // PLACE PHASE
   if (inPlacePhase) {
-    if (cellVal) return; // can't place on occupied
+    if (cellVal) return;
 
     state.board[idx] = player;
     state.lastPlaced[player] = idx;
 
-    // ✅ first move done -> lock turn selection buttons
     onFirstValidMoveLockTurnButtons();
 
     const res = checkWinner();
     if (res) {
-      renderBoard();
+      renderBoard(res.line);
       setStatus();
-      glowLine(res.line);
-      endGame(`✅ ${res.winner} wins!`, res.winner, res.line);
+      endGame(`✅ ${res.winner} wins!`, res.winner);
       return;
     }
 
-    // ✅ auto switch
     switchTurn();
     renderBoard();
     setStatus();
     return;
   }
 
-  // -------- MOVE PHASE (must move: withdraw + place) --------
-  // click on your own piece => select/deselect
+  // MOVE PHASE
   if (cellVal === player) {
     state.selectedFrom = (state.selectedFrom === idx) ? null : idx;
     renderBoard();
@@ -185,15 +225,12 @@ function onCellClick(e) {
     return;
   }
 
-  // click on empty => move selected piece (or auto lastPlaced)
   if (cellVal === "") {
     let from = state.selectedFrom;
 
-    // If no selection, auto move last used piece
+    // If no selection -> auto move last used piece
     if (from === null) {
       from = state.lastPlaced[player];
-
-      // safety fallback
       if (from === null || state.board[from] !== player) {
         from = state.board.findIndex(v => v === player);
       }
@@ -204,32 +241,26 @@ function onCellClick(e) {
       return;
     }
 
-    // move
     state.board[from] = "";
     state.board[idx] = player;
     state.lastPlaced[player] = idx;
     clearSelection();
 
-    // ✅ first move lock (in case someone didn’t place but moved later; rare)
     onFirstValidMoveLockTurnButtons();
 
     const res = checkWinner();
     if (res) {
-      renderBoard();
+      renderBoard(res.line);
       setStatus();
-      glowLine(res.line);
-      endGame(`✅ ${res.winner} wins!`, res.winner, res.line);
+      endGame(`✅ ${res.winner} wins!`, res.winner);
       return;
     }
 
-    // ✅ auto switch
     switchTurn();
     renderBoard();
     setStatus();
     return;
   }
-
-  // click opponent piece => ignore
 }
 
 function resetBoardOnly() {
@@ -239,7 +270,6 @@ function resetBoardOnly() {
   state.selectedFrom = null;
   state.lastPlaced = { X: null, O: null };
 
-  // ✅ allow first-turn selection again after reset/new
   unlockFirstTurnButtons();
 
   renderBoard();
@@ -255,7 +285,6 @@ function newGameKeepScores() {
 resetBtn.addEventListener("click", resetBoardOnly);
 newBtn.addEventListener("click", newGameKeepScores);
 
-// ✅ First-turn selection ONLY (disabled after first valid move)
 turnXBtn.addEventListener("click", () => {
   if (state.firstTurnLocked) return;
   state.turn = "X";

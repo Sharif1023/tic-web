@@ -3,88 +3,140 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>TicTacToe (3 Pieces + Move)</title>
-  <link rel="stylesheet" href="/static/style.css"/>
-</head>
-<body>
-  <div class="bg"></div>
+  <title>TicTacToe</title>
 
-  <main class="wrap">
-    <header class="top">
-      <div class="brand">
-        <div class="logo">TT</div>
-        <div>
-          <h1>TicTacToe</h1>
-          <p class="sub">Rule: Each player has only 3 pieces. After placing 3, move by withdrawing a piece.</p>
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          boxShadow: {
+            glow: "0 20px 70px rgba(0,0,0,.45)",
+            soft: "0 12px 40px rgba(0,0,0,.28)",
+          }
+        }
+      }
+    }
+  </script>
+</head>
+
+<body class="min-h-screen text-slate-100 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900">
+  <!-- background blobs -->
+  <div class="pointer-events-none fixed inset-0">
+    <div class="absolute -top-24 -left-20 h-[420px] w-[420px] rounded-full bg-blue-500/20 blur-3xl"></div>
+    <div class="absolute top-12 -right-24 h-[480px] w-[480px] rounded-full bg-emerald-400/15 blur-3xl"></div>
+    <div class="absolute bottom-[-120px] left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-cyan-400/10 blur-3xl"></div>
+  </div>
+
+  <main class="relative mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+    <!-- Header -->
+    <header class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <!-- Brand -->
+      <div class="flex items-center gap-3">
+        <div class="grid h-12 w-12 place-items-center rounded-2xl border border-white/15 bg-white/10 shadow-soft font-black tracking-wide">
+          TT
         </div>
+        <h1 class="text-xl font-extrabold leading-tight sm:text-2xl">TicTacToe</h1>
       </div>
 
-      <div class="panel">
-        <div class="status">
-          <span class="pill" id="turnPill">Turn: X</span>
-          <span class="pill ghost" id="movesPill">Pieces: X 0/3 • O 0/3</span>
-        </div>
+      <!-- Panel -->
+      <div class="w-full rounded-2xl border border-white/10 bg-white/5 p-4 shadow-glow backdrop-blur lg:max-w-3xl">
+        <div class="flex flex-col gap-3">
+          <!-- Row 1: Status + Actions -->
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex flex-wrap items-center gap-2">
+              <span id="turnPill"
+                class="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-sm font-bold">
+                Turn: X
+              </span>
+              <span id="movesPill"
+                class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-300">
+                Pieces: X 0/3 • O 0/3
+              </span>
+            </div>
 
-        <div class="status">
-          <span class="pill">Select Turn:</span>
-          <button class="btn" id="turnX">X</button>
-          <button class="btn" id="turnO">O</button>
-        </div>
+            <div class="flex items-center gap-2">
+              <button id="resetBtn" type="button"
+                class="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-bold hover:bg-white/15 active:translate-y-[1px] transition">
+                Reset
+              </button>
+              <button id="newBtn" type="button"
+                class="rounded-xl border border-white/15 bg-gradient-to-r from-emerald-400/15 to-blue-400/15 px-4 py-2 text-sm font-bold hover:from-emerald-400/20 hover:to-blue-400/20 active:translate-y-[1px] transition">
+                New Game
+              </button>
+            </div>
+          </div>
 
-        <div class="actions">
-          <button class="btn" id="resetBtn">Reset</button>
-          <button class="btn secondary" id="newBtn">New Game</button>
+          <!-- Row 2: First Turn + Score -->
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <!-- First Turn Controls -->
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-200">
+                First Turn:
+              </span>
+
+              <button id="turnX" type="button"
+                class="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-black hover:bg-white/15 active:translate-y-[1px] transition disabled:opacity-50 disabled:cursor-not-allowed">
+                X
+              </button>
+
+              <button id="turnO" type="button"
+                class="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-black hover:bg-white/15 active:translate-y-[1px] transition disabled:opacity-50 disabled:cursor-not-allowed">
+                O
+              </button>
+            </div>
+
+            <!-- Score -->
+            <div class="grid grid-cols-3 gap-2">
+              <div class="min-w-[92px] rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm">
+                <span class="font-black">X</span>
+                <span class="float-right font-black" id="xWins">0</span>
+              </div>
+              <div class="min-w-[92px] rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm">
+                <span class="font-black">O</span>
+                <span class="float-right font-black" id="oWins">0</span>
+              </div>
+              <div class="min-w-[92px] rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm">
+                <span class="font-black">Draw</span>
+                <span class="float-right font-black" id="draws">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tip -->
+          
         </div>
       </div>
     </header>
 
-    <section class="game">
-      <div class="card">
-        <div class="board" id="board"></div>
+    <!-- Game -->
+    <section class="mt-5">
+      <div class="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-glow backdrop-blur sm:p-6">
+        <div id="board"
+          class="mx-auto grid w-full max-w-[560px] grid-cols-3 gap-3 sm:gap-3.5"
+          aria-label="tic tac toe board">
+        </div>
 
-        <div class="footer">
-          <div class="hint">
-            Place up to 3 pieces. Then select your piece to withdraw and place it on an empty cell.
-            If you don't select, your last used piece will move automatically.
-          </div>
+        <div class="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          
 
-          <div class="score">
-            <div class="scoreBox">
-              <span class="tag">X</span>
-              <span class="val" id="xWins">0</span>
-            </div>
-            <div class="scoreBox">
-              <span class="tag">O</span>
-              <span class="val" id="oWins">0</span>
-            </div>
-            <div class="scoreBox">
-              <span class="tag">Draw</span>
-              <span class="val" id="draws">0</span>
-            </div>
+          <div class="text-xs text-slate-400">
+            Shortcuts: <span class="font-semibold text-slate-200">R</span> Reset •
+            <span class="font-semibold text-slate-200">N</span> New Game
           </div>
         </div>
       </div>
-
-      <aside class="side">
-        <div class="sideCard">
-          <h2>How to play</h2>
-          <ul>
-            <li>Manual turn selection using X / O buttons</li>
-            <li>Each player can place only 3 pieces</li>
-            <li>After 3 pieces, you must move (withdraw + place)</li>
-            <li>No selection means last used piece moves</li>
-          </ul>
-        </div>
-
-        <div class="sideCard">
-          <h2>Keyboard</h2>
-          <p>Press <b>R</b> to reset board</p>
-          <p>Press <b>N</b> for new game (scores stay)</p>
-        </div>
-      </aside>
     </section>
 
-    <div class="toast" id="toast"></div>
+    <!-- Toast -->
+    <div id="toast" role="status" aria-live="polite"
+      class="fixed left-1/2 bottom-4 z-50 w-[min(560px,calc(100vw-24px))] -translate-x-1/2 translate-y-2
+             rounded-xl border border-white/10 bg-slate-900/80 px-4 py-3 text-center text-sm font-extrabold
+             opacity-0 shadow-glow backdrop-blur transition-all duration-200">
+      Ready!
+    </div>
   </main>
 
   <script src="/static/app.js"></script>
