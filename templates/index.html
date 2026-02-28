@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TicTacToe (3 Pieces + Move)</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body>
+  <div class="bg"></div>
+
+  <main class="wrap">
+    <header class="top">
+      <div class="brand">
+        <div class="logo">TT</div>
+        <div>
+          <h1>TicTacToe</h1>
+          <p class="sub">Rule: Each player has only 3 pieces. After placing 3, move by withdrawing a piece.</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="status">
+          <span class="pill" id="turnPill">Turn: X</span>
+          <span class="pill ghost" id="movesPill">Pieces: X 0/3 • O 0/3</span>
+        </div>
+
+        <div class="status">
+          <span class="pill">Select Turn:</span>
+          <button class="btn" id="turnX">X</button>
+          <button class="btn" id="turnO">O</button>
+        </div>
+
+        <div class="actions">
+          <button class="btn" id="resetBtn">Reset</button>
+          <button class="btn secondary" id="newBtn">New Game</button>
+        </div>
+      </div>
+    </header>
+
+    <section class="game">
+      <div class="card">
+        <div class="board" id="board"></div>
+
+        <div class="footer">
+          <div class="hint">
+            Place up to 3 pieces. Then select your piece to withdraw and place it on an empty cell.
+            If you don't select, your last used piece will move automatically.
+          </div>
+
+          <div class="score">
+            <div class="scoreBox">
+              <span class="tag">X</span>
+              <span class="val" id="xWins">0</span>
+            </div>
+            <div class="scoreBox">
+              <span class="tag">O</span>
+              <span class="val" id="oWins">0</span>
+            </div>
+            <div class="scoreBox">
+              <span class="tag">Draw</span>
+              <span class="val" id="draws">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="side">
+        <div class="sideCard">
+          <h2>How to play</h2>
+          <ul>
+            <li>Manual turn selection using X / O buttons</li>
+            <li>Each player can place only 3 pieces</li>
+            <li>After 3 pieces, you must move (withdraw + place)</li>
+            <li>No selection means last used piece moves</li>
+          </ul>
+        </div>
+
+        <div class="sideCard">
+          <h2>Keyboard</h2>
+          <p>Press <b>R</b> to reset board</p>
+          <p>Press <b>N</b> for new game (scores stay)</p>
+        </div>
+      </aside>
+    </section>
+
+    <div class="toast" id="toast"></div>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
