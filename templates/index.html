@@ -22,7 +22,7 @@
   </script>
 </head>
 
-<body class="min-h-screen text-slate-100 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900">
+<body class="min-h-screen text-slate-100 bg-gradient-to-b from-slate-950 via-slate-550 to-slate-900">
   <!-- background blobs -->
   <div class="pointer-events-none fixed inset-0">
     <div class="absolute -top-24 -left-20 h-[420px] w-[420px] rounded-full bg-blue-500/20 blur-3xl"></div>
@@ -86,20 +86,36 @@
                 class="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-black hover:bg-white/15 active:translate-y-[1px] transition disabled:opacity-50 disabled:cursor-not-allowed">
                 O
               </button>
+              <span class="mx-1 hidden sm:inline text-slate-500">|</span>
+
+<span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-200">
+  Mode:
+</span>
+
+<button id="modePvp" type="button"
+  class="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-black hover:bg-white/15 active:translate-y-[1px] transition">
+  PvP
+</button>
+
+<button id="modeAi" type="button"
+  class="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-black hover:bg-white/15 active:translate-y-[1px] transition">
+  AI
+</button>
             </div>
 
             <!-- Score -->
             <div class="grid grid-cols-3 gap-2">
               <div class="min-w-[92px] rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm">
-                <span class="font-black">X</span>
+                <span class="font-black">X :</span>
                 <span class="float-right font-black" id="xWins">0</span>
               </div>
               <div class="min-w-[92px] rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm">
-                <span class="font-black">O</span>
+                <span class="font-black">O :
+                </span>
                 <span class="float-right font-black" id="oWins">0</span>
               </div>
               <div class="min-w-[92px] rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm">
-                <span class="font-black">Draw</span>
+                <span class="font-black">Draw :</span>
                 <span class="float-right font-black" id="draws">0</span>
               </div>
             </div>
