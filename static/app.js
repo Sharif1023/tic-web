@@ -21,6 +21,14 @@ const WIN_LINES = [
   [0,4,8],[2,4,6]
 ];
 
+// ✅ HARD difficulty knobs
+const AI_DIFFICULTY = "hard";
+const AI_DEPTH = {
+  easy:   { place: 6,  move: 4 },
+  medium: { place: 8,  move: 6 },
+  hard:   { place: 10, move: 8 }
+}[AI_DIFFICULTY];
+
 let state = {
   board: Array(9).fill(""),
   turn: "X",
@@ -30,13 +38,11 @@ let state = {
   selectedFrom: null,
   lastPlaced: { X: null, O: null },
 
-  // first turn selectable once
   firstTurnLocked: false,
 
-  // mode
   modeLocked: false,
-  mode: "pvp",            // "pvp" | "ai"
-  human: "X",             // only used in ai mode
+  mode: "pvp",     // "pvp" | "ai"
+  human: "X",
   ai: "O",
 
   scores: { X: 0, O: 0, D: 0 }
@@ -53,8 +59,8 @@ function showToast(msg) {
   }, 1400);
 }
 
-function countPieces(p) {
-  return state.board.filter(v => v === p).length;
+function countPieces(p, board = state.board) {
+  return board.reduce((acc, v) => acc + (v === p ? 1 : 0), 0);
 }
 
 function lockFirstTurnButtons() {
@@ -62,7 +68,6 @@ function lockFirstTurnButtons() {
   turnXBtn.disabled = true;
   turnOBtn.disabled = true;
 }
-
 function unlockFirstTurnButtons() {
   state.firstTurnLocked = false;
   turnXBtn.disabled = false;
@@ -74,7 +79,6 @@ function lockModeButtons() {
   if (modePvpBtn) modePvpBtn.disabled = true;
   if (modeAiBtn) modeAiBtn.disabled = true;
 }
-
 function unlockModeButtons() {
   state.modeLocked = false;
   if (modePvpBtn) modePvpBtn.disabled = false;
@@ -87,8 +91,14 @@ function setModeButtonUI() {
   const active = "bg-white/20 border-white/25";
   const normal = "bg-white/10 border-white/15";
 
-  modePvpBtn.className = modePvpBtn.className.replace(active, "").replace(normal, "").trim() + " " + (state.mode === "pvp" ? active : normal);
-  modeAiBtn.className = modeAiBtn.className.replace(active, "").replace(normal, "").trim() + " " + (state.mode === "ai" ? active : normal);
+  const clean = (cls) => cls
+    .replace(active, "")
+    .replace(normal, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  modePvpBtn.className = clean(modePvpBtn.className) + " " + (state.mode === "pvp" ? active : normal);
+  modeAiBtn.className = clean(modeAiBtn.className) + " " + (state.mode === "ai" ? active : normal);
 }
 
 function setStatus() {
@@ -98,7 +108,7 @@ function setStatus() {
   if (!state.gameOver) {
     const pieces = state.turn === "X" ? x : o;
     const phase = pieces < state.maxPiecesPerPlayer ? "Place" : "Move";
-    const modeLabel = state.mode === "ai" ? "AI" : "PvP";
+    const modeLabel = state.mode === "ai" ? "AI (Hard)" : "PvP";
     turnPill.textContent = `Turn: ${state.turn} (${phase}) • ${modeLabel}`;
   } else {
     turnPill.textContent = "Game Over";
@@ -116,9 +126,7 @@ function setStatus() {
 function checkWinner(board = state.board) {
   for (const [a,b,c] of WIN_LINES) {
     const v = board[a];
-    if (v && v === board[b] && v === board[c]) {
-      return { winner: v, line: [a,b,c] };
-    }
+    if (v && v === board[b] && v === board[c]) return { winner: v, line: [a,b,c] };
   }
   return null;
 }
@@ -149,6 +157,8 @@ function onFirstValidMoveLockButtons() {
   if (!state.modeLocked) lockModeButtons();
 }
 
+/* ---------------- UI cells ---------------- */
+
 function cellBaseClasses() {
   return [
     "aspect-square",
@@ -168,11 +178,9 @@ function cellBaseClasses() {
     "touch-manipulation"
   ].join(" ");
 }
-
 function selectedClasses() {
   return "ring-4 ring-blue-400/25 border-white/20 shadow-[0_18px_55px_rgba(0,0,0,.32)]";
 }
-
 function winClasses() {
   return "ring-4 ring-emerald-400/25 border-white/25 shadow-[0_22px_70px_rgba(0,0,0,.40)]";
 }
@@ -210,11 +218,9 @@ function renderBoard(winLine = null) {
   });
 }
 
-/* ---------------- AI HELPERS ---------------- */
+/* ---------------- AI (HARD: Minimax + alpha-beta + BLOCK FIRST) ---------------- */
 
-function cloneBoard(b) {
-  return b.slice();
-}
+function cloneBoard(b) { return b.slice(); }
 
 function empties(board) {
   const out = [];
@@ -239,63 +245,185 @@ function applyMove(board, player, move) {
   return nb;
 }
 
-function legalMovesFor(board, player) {
+function applyMoveLastPlaced(lastPlacedLocal, player, move) {
+  const nl = { X: lastPlacedLocal.X, O: lastPlacedLocal.O };
+  nl[player] = move.to;
+  return nl;
+}
+
+function legalMovesFor(board, player, lastPlacedLocal) {
   const pCount = piecesOf(board, player).length;
   const empty = empties(board);
 
+  // Place phase: center > corners > edges
   if (pCount < state.maxPiecesPerPlayer) {
-    return empty.map(to => ({ type: "place", to }));
+    const pref = [4,0,2,6,8,1,3,5,7];
+    const emptySet = new Set(empty);
+    const ordered = pref.filter(i => emptySet.has(i));
+    return ordered.map(to => ({ type: "place", to }));
   }
 
+  // Move phase: withdraw + place (from last used first)
   const ps = piecesOf(board, player);
+  const last = lastPlacedLocal?.[player] ?? null;
+
+  const orderedFrom = (last !== null && ps.includes(last))
+    ? [last, ...ps.filter(x => x !== last)]
+    : ps;
+
+  const prefTo = [4,0,2,6,8,1,3,5,7];
+  const emptySet = new Set(empty);
+  const orderedTo = prefTo.filter(i => emptySet.has(i));
+
   const moves = [];
-  for (const from of ps) {
-    for (const to of empty) {
-      moves.push({ type: "move", from, to });
-    }
+  for (const from of orderedFrom) {
+    for (const to of orderedTo) moves.push({ type: "move", from, to });
   }
   return moves;
 }
 
-// simple scoring: win > block > center > corner > anything
-function pickBestMove(board, player) {
-  const opp = player === "X" ? "O" : "X";
-  const moves = legalMovesFor(board, player);
-  if (!moves.length) return null;
-
-  // 1) can win now?
-  for (const m of moves) {
-    const nb = applyMove(board, player, m);
-    const res = checkWinner(nb);
-    if (res && res.winner === player) return m;
+// evaluation tuned for 3-piece variant
+function evaluateBoard(board, aiPlayer) {
+  const opp = aiPlayer === "X" ? "O" : "X";
+  const res = checkWinner(board);
+  if (res) {
+    if (res.winner === aiPlayer) return 1000000;
+    if (res.winner === opp) return -1000000;
   }
 
-  // 2) must block opponent win next?
-  for (const m of moves) {
-    const nb = applyMove(board, player, m);
-    // if after this move opponent cannot immediately win, prefer it
-    const oppMoves = legalMovesFor(nb, opp);
-    let oppCanWin = false;
-    for (const om of oppMoves) {
-      const nb2 = applyMove(nb, opp, om);
-      const r2 = checkWinner(nb2);
-      if (r2 && r2.winner === opp) { oppCanWin = true; break; }
+  let score = 0;
+
+  for (const [a,b,c] of WIN_LINES) {
+    const line = [board[a], board[b], board[c]];
+    const aiCount = line.filter(v => v === aiPlayer).length;
+    const opCount = line.filter(v => v === opp).length;
+    const emptyCount = 3 - aiCount - opCount;
+
+    if (aiCount > 0 && opCount === 0) {
+      if (aiCount === 2 && emptyCount === 1) score += 220;
+      else if (aiCount === 1 && emptyCount === 2) score += 30;
     }
-    if (!oppCanWin) return m;
+
+    if (opCount > 0 && aiCount === 0) {
+      if (opCount === 2 && emptyCount === 1) score -= 260;
+      else if (opCount === 1 && emptyCount === 2) score -= 34;
+    }
   }
 
-  // 3) prefer center
-  const center = 4;
-  const centerMove = moves.find(m => m.to === center);
-  if (centerMove) return centerMove;
+  const posWeight = [18,10,18, 10,26,10, 18,10,18];
+  for (let i = 0; i < 9; i++) {
+    if (board[i] === aiPlayer) score += posWeight[i];
+    else if (board[i] === opp) score -= posWeight[i];
+  }
 
-  // 4) prefer corners
-  const corners = new Set([0,2,6,8]);
-  const cornerMove = moves.find(m => corners.has(m.to));
-  if (cornerMove) return cornerMove;
+  return score;
+}
 
-  // 5) else any move
-  return moves[Math.floor(Math.random() * moves.length)];
+function keyOf(board, turn, lastPlacedLocal, depth) {
+  const lpX = lastPlacedLocal?.X ?? -1;
+  const lpO = lastPlacedLocal?.O ?? -1;
+  return board.join("") + "|" + turn + "|" + lpX + "|" + lpO + "|d" + depth;
+}
+
+function chooseAIMove(board, turn, lastPlacedLocal, aiPlayer) {
+  const aiCount = countPieces(aiPlayer, board);
+  const depth = aiCount < state.maxPiecesPerPlayer ? AI_DEPTH.place : AI_DEPTH.move;
+
+  const memo = new Map();
+  const opp = aiPlayer === "X" ? "O" : "X";
+
+  function minimax(b, t, lp, d, alpha, beta) {
+    const res = checkWinner(b);
+    if (res || d === 0) {
+      return { score: evaluateBoard(b, aiPlayer), move: null };
+    }
+
+    const k = keyOf(b, t, lp, d);
+    if (memo.has(k)) return memo.get(k);
+
+    const isMax = (t === aiPlayer);
+    const moves = legalMovesFor(b, t, lp);
+
+    if (!moves.length) {
+      const out = { score: evaluateBoard(b, aiPlayer), move: null };
+      memo.set(k, out);
+      return out;
+    }
+
+    // immediate win shortcut
+    for (const m of moves) {
+      const nb = applyMove(b, t, m);
+      const r = checkWinner(nb);
+      if (r && r.winner === t) {
+        const out = { score: isMax ? 999999 : -999999, move: m };
+        memo.set(k, out);
+        return out;
+      }
+    }
+
+    let best = { score: isMax ? -Infinity : Infinity, move: null };
+
+    for (const m of moves) {
+      const nb = applyMove(b, t, m);
+      const nlp = applyMoveLastPlaced(lp, t, m);
+      const nt = (t === "X") ? "O" : "X";
+
+      const child = minimax(nb, nt, nlp, d - 1, alpha, beta);
+      const sc = child.score;
+
+      if (isMax) {
+        if (sc > best.score) best = { score: sc, move: m };
+        alpha = Math.max(alpha, best.score);
+        if (beta <= alpha) break;
+      } else {
+        if (sc < best.score) best = { score: sc, move: m };
+        beta = Math.min(beta, best.score);
+        if (beta <= alpha) break;
+      }
+    }
+
+    memo.set(k, best);
+    return best;
+  }
+
+  const movesNow = legalMovesFor(board, turn, lastPlacedLocal);
+
+  // ✅ 1) BLOCK FIRST (opponent next move win থাকলে আগে block)
+  const oppImmediateWins = [];
+  for (const om of legalMovesFor(board, opp, lastPlacedLocal)) {
+    const b2 = applyMove(board, opp, om);
+    const r2 = checkWinner(b2);
+    if (r2 && r2.winner === opp) oppImmediateWins.push(om);
+  }
+
+  if (oppImmediateWins.length > 0) {
+    for (const m of movesNow) {
+      const nb = applyMove(board, turn, m);
+      const nlp = applyMoveLastPlaced(lastPlacedLocal, turn, m);
+
+      let stillWin = false;
+      const oppReplies = legalMovesFor(nb, opp, nlp);
+      for (const om of oppReplies) {
+        const nb2 = applyMove(nb, opp, om);
+        const r2 = checkWinner(nb2);
+        if (r2 && r2.winner === opp) { stillWin = true; break; }
+      }
+
+      if (!stillWin) return m; // block found
+    }
+    // If can't fully block, continue minimax (best survival)
+  }
+
+  // ✅ 2) If no block needed, try win now
+  for (const m of movesNow) {
+    const nb = applyMove(board, turn, m);
+    const r = checkWinner(nb);
+    if (r && r.winner === turn) return m;
+  }
+
+  // ✅ 3) Otherwise minimax (hard)
+  const result = minimax(board, turn, lastPlacedLocal, depth, -Infinity, Infinity);
+  return result.move || movesNow[0] || null;
 }
 
 function maybeAIMove() {
@@ -303,15 +431,13 @@ function maybeAIMove() {
   if (state.mode !== "ai") return;
   if (state.turn !== state.ai) return;
 
-  // small delay to feel natural
   setTimeout(() => {
     if (state.gameOver) return;
     if (state.turn !== state.ai) return;
 
-    const move = pickBestMove(state.board, state.ai);
+    const move = chooseAIMove(state.board, state.ai, state.lastPlaced, state.ai);
     if (!move) return;
 
-    // apply AI move to real state
     if (move.type === "place") {
       state.board[move.to] = state.ai;
       state.lastPlaced[state.ai] = move.to;
@@ -334,17 +460,14 @@ function maybeAIMove() {
     switchTurn();
     renderBoard();
     setStatus();
-
-    // if somehow ai gets consecutive turn (shouldn't), guard above will stop it
-  }, 350);
+  }, 220);
 }
 
-/* --------------- GAME INPUT --------------- */
+/* ---------------- GAME INPUT ---------------- */
 
 function onCellClick(e) {
   if (state.gameOver) return;
 
-  // In AI mode, block human from playing on AI's turn
   if (state.mode === "ai" && state.turn !== state.human) {
     showToast("AI is thinking...");
     return;
@@ -424,9 +547,10 @@ function onCellClick(e) {
     renderBoard();
     setStatus();
     maybeAIMove();
-    return;
   }
 }
+
+/* ---------------- RESET / NEW ---------------- */
 
 function resetBoardOnly() {
   state.board = Array(9).fill("");
@@ -448,12 +572,11 @@ function newGameKeepScores() {
   showToast("New game started");
 }
 
-/* --------------- BUTTONS --------------- */
+/* ---------------- BUTTONS ---------------- */
 
 resetBtn.addEventListener("click", resetBoardOnly);
 newBtn.addEventListener("click", newGameKeepScores);
 
-// First turn selection (only before first move)
 turnXBtn.addEventListener("click", () => {
   if (state.firstTurnLocked) return;
   state.turn = "X";
@@ -472,7 +595,6 @@ turnOBtn.addEventListener("click", () => {
   showToast("First turn set to O");
 });
 
-// Mode selection (only before first move)
 if (modePvpBtn) {
   modePvpBtn.addEventListener("click", () => {
     if (state.modeLocked) return;
@@ -486,13 +608,10 @@ if (modeAiBtn) {
   modeAiBtn.addEventListener("click", () => {
     if (state.modeLocked) return;
     state.mode = "ai";
-    // human = current selected first turn (state.turn) by default
-    state.human = state.turn;
+    state.human = state.turn;                 // human is selected first turn
     state.ai = state.turn === "X" ? "O" : "X";
     setStatus();
-    showToast("Mode: AI");
-    // if AI is supposed to start (rare, if user set first turn to ai side)
-    // actually human is always the selected first turn here, so AI won't start.
+    showToast("Mode: AI (Hard) • Block First");
   });
 }
 
@@ -501,6 +620,8 @@ document.addEventListener("keydown", (e) => {
   if (key === "r") resetBoardOnly();
   if (key === "n") newGameKeepScores();
 });
+
+/* ---------------- INIT ---------------- */
 
 renderBoard();
 setStatus();
